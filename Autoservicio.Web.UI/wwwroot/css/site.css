@@ -1,0 +1,82 @@
+/* Estilo para el Sidebar */
+/*#sidebar {
+    width: 250px;
+    background-color: #343a40;
+    color: white;
+    padding: 15px;
+    position: fixed;*/ /* Fija el sidebar a la izquierda */
+    /*height: 100%;
+    top: 0;
+    left: 0;
+    transition: transform 0.3s ease-in-out, z-index 0.3s ease;*/ /* Transición más fluida */
+    /*z-index: 1000;*/ /* Asegura que el sidebar esté sobre otros elementos */
+/*}*/
+
+    /* Ocultar el Sidebar */
+    /*#sidebar.hidden {
+        transform: translateX(-100%);*/ /* Mueve el sidebar fuera de la pantalla */
+    /*}*/
+
+/* El contenido principal */
+/*#content {
+    margin-left: 250px;*/ /* Deja espacio para el sidebar */
+    /*padding: 20px;
+    transition: margin-left 0.3s ease;*/ /* Transición suave para el contenido */
+    /*transition: transform 0.3s ease;*/ /* Asegura que el contenido se mueva con suavidad */
+/*}*/
+
+    /* Cuando el Sidebar está oculto, el contenido ocupa el 100% del ancho */
+    /*#content.full-width {
+        margin-left: 0;
+    }*/
+
+    /* Para la transición del sidebar */
+    /*#sidebar.hidden + #content {
+        transform: translateX(0);*/ /* El contenido se mueve cuando el sidebar se oculta */
+    /*}
+
+    #footer {
+        transition: margin-left 0.3s ease;
+    }
+
+    #footer.full-width {
+        margin-left: 0;
+    }*/
+#footer {
+    transition: margin-left 0.3s ease;
+    margin-left: 250px; /* Si el sidebar está visible, el footer se alineará después de él */
+}
+
+    #footer.full-width {
+        margin-left: 0; /* Cuando el sidebar esté oculto, el footer se moverá hacia el borde */
+    }
+
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#content {
+    transition: margin-left 0.3s ease;
+}
+
+    #content.full-width {
+        margin-left: 0; /* Cuando el sidebar esté oculto, el contenido se moverá hacia el borde */
+    }
+
+#sidebar {
+    width: 250px;
+    background-color: #343a40;
+    color: white;
+    padding: 15px;
+    position: fixed;
+    height: 100%;
+    transition: transform 0.3s ease-in-out;
+    z-index: 1;
+    top: 0;
+}
+
+    #sidebar.hidden {
+        transform: translateX(-100%); /* Oculta el sidebar */
+    }

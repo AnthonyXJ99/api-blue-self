@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Autoservicio</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/Autoservicio.Web.UI.styles.css" asp-append-version="true" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+
+    <style>
+        .wrapper {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: #343a40;
+            color: white;
+            padding: 15px;
+            position: fixed;
+            height: 100%;
+            transition: transform 0.3s ease-in-out;
+            z-index: 1;
+        }
+
+            #sidebar ul {
+                list-style-type: none;
+                padding-left: 0;
+            }
+
+                #sidebar ul li a {
+                    color: white;
+                    text-decoration: none;
+                    display: block;
+                    padding: 10px;
+                    transition: background-color 0.3s;
+                }
+
+                    #sidebar ul li a:hover {
+                        background-color: #575757;
+                    }
+
+        #content {
+            margin-left: 250px;
+            padding: 20px;
+            width: 100%;
+            transition: margin-left 0.3s ease;
+        }
+
+        #sidebar.hidden {
+            transform: translateX(-100%);
+        }
+
+        #content.full-width {
+            margin-left: 0;
+        }
+
+        .submenu {
+            display: none;
+            padding-left: 20px;
+        }
+
+        .submenu-active {
+            display: block;
+        }
+
+        .submenu li {
+            padding-left: 15px;
+        }
+
+        .submenu-icon {
+            transition: transform 0.3s;
+        }
+
+        .submenu-icon-rotate {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div id="sidebar" class="sidebar">
+            <ul class="list-unstyled">
+                <li><a href="/" class="menu-item" data-title="Home">Home</a></li>
+
+                <li>
+                    <a href="javascript:void(0);" class="menu-item" id="productos" data-title="Datos maestros">
+                        Datos maestros
+                        <i class="fas fa-chevron-right submenu-icon" data-target="productosSubmenu"></i>
+                    </a>
+                    <ul class="submenu" id="productosSubmenu">
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Grupos de productos">Grupos de productos</a></li>
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Categorías de productos">Categorías de productos</a></li>
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Productos">Productos</a></li>
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Imágenes">Imágenes</a></li>
+                    </ul>
+                </li>
+
+                <li>
+                    <a href="javascript:void(0);" class="menu-item" id="definicion" data-title="Definiciones">
+                        Definiciones
+                        <i class="fas fa-chevron-right submenu-icon" data-target="definicionSubmenu"></i>
+                    </a>
+                    <ul class="submenu" id="definicionSubmenu">
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Dispositivos">Dispositivos de autoservicio</a></li>
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="POS">Dispositivos POS</a></li>
+                    </ul>
+                </li>
+
+                <li>
+                    <a href="javascript:void(0);" class="menu-item" id="configuracion" data-title="Configuración">
+                        Configuración
+                        <i class="fas fa-chevron-right submenu-icon" data-target="configuracionSubmenu"></i>
+                    </a>
+                    <ul class="submenu" id="configuracionSubmenu">
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Parametrizaciones generales">Parametrizaciones generales</a></li>
+                        <li><a href="javascript:void(0);" class="submenu-item" data-title="Numeración de documentos">Numeración de documentos</a></li>
+                    </ul>
+                </li>
+
+                <li><a href="javascript:void(0);" class="menu-item" data-title="Categoría de productos">Categoría de productos</a></li>
+            </ul>
+        </div>
+
+        <div id="content" class="content">
+            <header>
+                <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+                    <div class="container">
+                        <!-- Botón de menú a la izquierda -->
+                        <button id="sidebarToggle" class="btn btn-primary me-2">☰</button>
+                        <!-- Marca 'Autoservicio' alineada a la izquierda, después del botón de menú -->
+                        <a class="navbar-brand me-auto" asp-area="" asp-page="/Index">Autoservicio</a>
+                    </div>
+                </nav>
+            </header>
+
+            <main role="main" class="pb-3">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+
+    <footer class="border-top footer text-muted" id="footer">
+        <div class="container">
+            &copy; 2025 Bartech - Autoservicio v1.0  - <a asp-area="" asp-page="/Privacy">Privacidad</a>
+        </div>
+    </footer>
+
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Mostrar/ocultar el sidebar al hacer clic en el botón
+            $("#sidebarToggle").click(function () {
+                $("#sidebar").toggleClass("hidden"); // Cambia la visibilidad del sidebar
+                $("#content").toggleClass("full-width"); // Cambia el tamaño del contenido
+                $("#footer").toggleClass("full-width"); // Cambia el tamaño del pie de página
+            });
+
+            // Funcionalidad para mostrar/ocultar el submenú
+            $("#productos").click(function () {
+                $("#productosSubmenu").toggleClass("submenu-active");
+                $("#submenuIcon").toggleClass("submenu-icon-rotate");
+            });
+
+            $("#configuracion").click(function () {
+                $("#configuracionSubmenu").toggleClass("submenu-active");
+                $("#submenuIcon").toggleClass("submenu-icon-rotate");
+            });
+
+            $("#definicion").click(function () {
+                $("#definicionSubmenu").toggleClass("submenu-active");
+                $("#submenuIcon").toggleClass("submenu-icon-rotate");
+            });
+
+            // Actualizar el título en la navbar cuando se hace clic en un menú o submenú
+            $(".menu-item").click(function () {
+                var title = $(this).data("title");
+                $(".navbar-brand").text(title); // Actualiza el texto del navbar
+            });
+
+            $(".submenu-item").click(function () {
+                var title = $(this).data("title");
+                $(".navbar-brand").text(title); // Actualiza el texto del navbar
+            });
+        });
+    </script>
+
+</body>
+</html>

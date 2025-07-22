@@ -1,0 +1,82 @@
+# Archivos y directorios generados por Visual Studio y .NET
+
+## Binarios
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.exe
+*.pdb
+*.suo
+*.user
+*.config.user
+*.aps
+*.bsc
+*.cache
+*.ncb
+*.opendb
+*.res
+*.scc
+*.vspscc
+*.vssscc
+
+## Directorios de paquetes NuGet
+packages/
+*.nupkg
+
+## Archivos de usuario y configuración local
+*.user
+*.log
+*.bak
+*.resharper
+*.vsmdi
+*.vsmacros
+[Tt]emp/
+[Tt]rash/
+[Oo]ut/
+[Ee]rrors/
+
+## Archivos de Visual Studio Code
+.vscode/
+
+## Archivos de Rider
+.idea/
+*.iml
+
+## Archivos de pruebas
+TestResults/
+*.trx
+
+## Archivos de publicaciones web
+[Pp]ublish/
+[Ww]eb[Pp]ublish/
+
+## Archivos generados por scaffolding
+[Aa]utoGenerated/
+
+## Archivos de certificados y claves
+*.pfx
+*.snk
+
+## Archivos de caché de dependencias
+node_modules/
+npm-debug.log
+yarn-error.log
+
+## Otros archivos temporales o generados
+*.zip
+*.rar
+*.7z
+*.tmp
+~*.docx
+~*.xlsx
+~*.pptx
+
+# Proyectos de bases de datos de SQL Server (SSDT)
+*.dbmdl
+*.jfm
+
+# Azure相關
+*.publishsettings
+*.sub
