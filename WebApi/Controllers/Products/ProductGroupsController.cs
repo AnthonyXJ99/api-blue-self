@@ -32,17 +32,68 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         }
 
         /// <summary>
+        /// Construye la URL pública completa a partir de una ruta relativa.
+        /// </summary>
+        /// <param name="relativePath">Ruta relativa (ej: /images/archivo.jpg)</param>
+        /// <returns>URL completa</returns>
+        private string BuildPublicUrl(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+                return string.Empty;
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            return $"{baseUrl}{relativePath}";
+        }
+
+        /// <summary>
+        /// Procesa un grupo para incluir URLs completas de imágenes manteniendo compatibilidad.
+        /// </summary>
+        /// <param name="group">Grupo a procesar</param>
+        /// <returns>ProductGroup con ImageUrl procesada</returns>
+        private ProductGroup ProcessGroupWithImages(ProductGroup group)
+        {
+            // ✅ Crear una copia del grupo original
+            var processedGroup = new ProductGroup
+            {
+                ProductGroupCode = group.ProductGroupCode,
+                ProductGroupName = group.ProductGroupName,
+                FrgnName = group.FrgnName,
+                // ✅ CAMBIO CLAVE: ImageUrl ahora contiene la URL completa
+                ImageUrl = !string.IsNullOrEmpty(group.ImageUrl) ? BuildPublicUrl(group.ImageUrl) : group.ImageUrl,
+                Description = group.Description,
+                FrgnDescription = group.FrgnDescription,
+                Enabled = group.Enabled,
+                VisOrder = group.VisOrder,
+                DataSource = group.DataSource,
+                ProductGroupCodeERP = group.ProductGroupCodeERP,
+                ProductGroupCodePOS = group.ProductGroupCodePOS
+            };
+
+            return processedGroup;
+        }
+
+        /// <summary>
+        /// Procesa una lista de grupos para incluir URLs completas de imágenes.
+        /// </summary>
+        /// <param name="groups">Lista de grupos a procesar</param>
+        /// <returns>Lista de ProductGroup con URLs construidas dinámicamente</returns>
+        private IEnumerable<ProductGroup> ProcessGroupsWithImages(IEnumerable<ProductGroup> groups)
+        {
+            return groups.Select(ProcessGroupWithImages);
+        }
+
+        /// <summary>
         /// Obtiene una lista de todos los grupos de productos.
         /// </summary>
-        /// <returns>Una lista de objetos <see cref="ProductGroup"/>.</returns>
-       
+        /// <returns>Una lista de objetos <see cref="ProductGroup"/> con URLs completas.</returns>
         // GET: api/ProductGroups/all 
         [HttpGet("all")]
         public async Task<ActionResult<IEnumerable<ProductGroup>>> GetAllProductGroup()
         {
-            return await _context.ProductGroup.ToListAsync();
+            var groups = await _context.ProductGroup.ToListAsync();
+            var processedGroups = ProcessGroupsWithImages(groups);
+            return Ok(processedGroups);
         }
-
 
         // GET: api/ProductGroups
         [HttpGet]
@@ -55,12 +106,14 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             {
                 // Comenzamos la consulta con todos los grupos de productos
                 IQueryable<ProductGroup> query = _context.ProductGroup;
- 
+
                 // Si se proporciona un término de búsqueda, filtramos los resultados
                 if (!string.IsNullOrEmpty(search))
                 {
-                    // Realizamos una búsqueda que sea insensible a mayúsculas y minúsculas en el código y  nombre del grupo de producto
-                    query = query.Where(pg => pg.ProductGroupCode.Contains(search) || pg.ProductGroupName.Contains(search));
+                    // Realizamos una búsqueda que sea insensible a mayúsculas y minúsculas en el código y nombre del grupo de producto
+                    query = query.Where(pg => pg.ProductGroupCode.Contains(search) ||
+                                             pg.ProductGroupName.Contains(search) ||
+                                             (pg.FrgnName != null && pg.FrgnName.Contains(search)));
                 }
 
                 // Calcular el total de grupo de productos después de aplicar el filtro
@@ -68,12 +121,17 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
 
                 // Obtener la página de datos solicitada
                 var productsGroup = await query
+                    .OrderBy(pg => pg.VisOrder) // Ordenar por VisOrder
+                    .ThenBy(pg => pg.ProductGroupName) // Luego por nombre
                     .Skip((pageNumber - 1) * pageSize)  // Saltar los primeros (pageNumber - 1) * pageSize registros
                     .Take(pageSize)                     // Tomar solo 'pageSize' registros
                     .ToListAsync();
 
-                // Crear la respuesta paginada
-                var response = new PagedResponse<ProductGroup>(totalCount, pageNumber, pageSize, productsGroup);
+                // ✅ Procesar grupos con URLs dinámicas manteniendo compatibilidad
+                var processedGroups = ProcessGroupsWithImages(productsGroup);
+
+                // ✅ MANTENER la estructura PagedResponse original
+                var response = new PagedResponse<ProductGroup>(totalCount, pageNumber, pageSize, processedGroups.ToList());
 
                 return Ok(response);
             }
@@ -86,7 +144,6 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
             }
         }
-
 
         // GET: api/ProductGroups/5
         /// <summary>
@@ -104,7 +161,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 return NotFound();
             }
 
-            return productGroup;
+            // ✅ Procesar grupo con URL dinámica manteniendo compatibilidad
+            var processedGroup = ProcessGroupWithImages(productGroup);
+            return Ok(processedGroup);
         }
 
         // PUT: api/ProductGroups/5
@@ -169,7 +228,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 }
             }
 
-            return CreatedAtAction("GetProductGroup", new { groupCode = productGroup.ProductGroupCode }, productGroup);
+            // ✅ Procesar grupo creado con URL dinámica manteniendo compatibilidad
+            var processedGroup = ProcessGroupWithImages(productGroup);
+            return CreatedAtAction("GetProductGroup", new { groupCode = productGroup.ProductGroupCode }, processedGroup);
         }
 
         // DELETE: api/ProductGroups/5
@@ -191,6 +252,83 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // GET: api/ProductGroups/enabled
+        /// <summary>
+        /// Obtiene solo los grupos habilitados (Enabled = 'Y').
+        /// </summary>
+        /// <returns>Lista de grupos habilitados con URLs completas.</returns>
+        [HttpGet("enabled")]
+        public async Task<ActionResult<IEnumerable<ProductGroup>>> GetEnabledGroups()
+        {
+            var enabledGroups = await _context.ProductGroup
+                .Where(pg => pg.Enabled == "Y")
+                .OrderBy(pg => pg.VisOrder)
+                .ThenBy(pg => pg.ProductGroupName)
+                .ToListAsync();
+
+            var processedGroups = ProcessGroupsWithImages(enabledGroups);
+            return Ok(processedGroups);
+        }
+
+        // GET: api/ProductGroups/with-images
+        /// <summary>
+        /// Obtiene solo los grupos que tienen imagen asignada.
+        /// </summary>
+        /// <returns>Lista de grupos con imagen y URLs completas.</returns>
+        [HttpGet("with-images")]
+        public async Task<ActionResult<IEnumerable<ProductGroup>>> GetGroupsWithImages()
+        {
+            var groupsWithImages = await _context.ProductGroup
+                .Where(pg => !string.IsNullOrEmpty(pg.ImageUrl))
+                .OrderBy(pg => pg.VisOrder)
+                .ThenBy(pg => pg.ProductGroupName)
+                .ToListAsync();
+
+            var processedGroups = ProcessGroupsWithImages(groupsWithImages);
+            return Ok(processedGroups);
+        }
+
+        // GET: api/ProductGroups/{groupCode}/categories
+        /// <summary>
+        /// Obtiene las categorías que pertenecen a un grupo específico.
+        /// </summary>
+        /// <param name="groupCode">Código del grupo</param>
+        /// <returns>Lista de categorías del grupo</returns>
+        [HttpGet("{groupCode}/categories")]
+        public async Task<ActionResult<IEnumerable<object>>> GetCategoriesByGroup(string groupCode)
+        {
+            // Verificar que el grupo existe
+            var groupExists = await _context.ProductGroup.AnyAsync(pg => pg.ProductGroupCode == groupCode);
+            if (!groupExists)
+            {
+                return NotFound("Grupo de productos no encontrado");
+            }
+
+            var categories = await _context.ProductCategory
+                .Where(pc => pc.GroupItemCode == groupCode)
+                .OrderBy(pc => pc.VisOrder)
+                .ThenBy(pc => pc.CategoryItemName)
+                .ToListAsync();
+
+            // Procesar categorías con URLs dinámicas (si tienen imagen)
+            var processedCategories = categories.Select(cat => new
+            {
+                cat.CategoryItemCode,
+                cat.CategoryItemName,
+                cat.FrgnName,
+                ImageUrl = !string.IsNullOrEmpty(cat.ImageUrl) ? BuildPublicUrl(cat.ImageUrl) : null,
+                ImageRelativePath = cat.ImageUrl,
+                cat.Description,
+                cat.FrgnDescription,
+                cat.VisOrder,
+                cat.Enabled,
+                cat.DataSource,
+                cat.GroupItemCode
+            });
+
+            return Ok(processedCategories);
         }
 
         /// <summary>

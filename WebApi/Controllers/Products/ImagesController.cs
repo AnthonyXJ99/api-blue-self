@@ -1,5 +1,4 @@
-﻿
-using BlueSelfCheckout.WebApi.Models.Products;
+﻿using BlueSelfCheckout.WebApi.Models.Products;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BlueSelfCheckout.Data;
@@ -30,6 +29,20 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         }
 
         /// <summary>
+        /// Construye la URL pública completa a partir de una ruta relativa.
+        /// </summary>
+        /// <param name="relativePath">Ruta relativa (ej: /images/archivo.jpg)</param>
+        /// <returns>URL completa</returns>
+        private string BuildPublicUrl(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+                return string.Empty;
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            return $"{baseUrl}{relativePath}";
+        }
+
+        /// <summary>
         /// Sube una imagen, la guarda físicamente y registra en base de datos.
         /// </summary>
         /// <param name="file">Archivo de imagen a subir.</param>
@@ -38,14 +51,17 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         /// <param name="description">Descripción opcional de la imagen.</param>
         /// <returns>La imagen creada con su URL pública.</returns>
         [HttpPost("upload")]
-        public async Task<ActionResult<Image>> UploadImage(
+        public async Task<ActionResult<object>> UploadImage(
             [FromForm] IFormFile file,
             [FromForm] string imageTitle,
             [FromForm] string imageType = "Item",
             [FromForm] string description = null,
-            [FromForm] string tag="",
+            [FromForm] string tag = "",
             [FromForm] string deviceId = null)
         {
+            string uniqueFileName = null;
+            string filePath = null;
+
             try
             {
                 // Validaciones del archivo
@@ -61,24 +77,23 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 if (string.IsNullOrEmpty(imageTitle))
                     return BadRequest("El título de la imagen es requerido.");
 
-                var validTypes = new[] { "Logo", "Publicidad", "Item","Banner" };
+                var validTypes = new[] { "Logo", "Publicidad", "Item", "Banner" };
                 if (!validTypes.Contains(imageType))
-                    return BadRequest("Tipo de imagen no válido. Debe ser: Logo, Publicidad o Item.");
+                    return BadRequest("Tipo de imagen no válido. Debe ser: Logo, Publicidad, Item o Banner.");
 
                 // Generar nombre único y código único
-                var uniqueFileName = $"{Guid.NewGuid()}{ext}";
+                uniqueFileName = $"{Guid.NewGuid()}{ext}";
                 var imageCode = $"IMG_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N")[..8]}";
 
                 // Guardar archivo físicamente
-                var filePath = Path.Combine(_imagesFolder, uniqueFileName);
+                filePath = Path.Combine(_imagesFolder, uniqueFileName);
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                // Construir URL pública
-                var baseUrl = $"{Request.Scheme}://{Request.Host}";
-                var publicUrl = $"{baseUrl}/images/{uniqueFileName}";
+                // ✅ CAMBIO PRINCIPAL: Solo guardar ruta relativa
+                var relativePath = $"/images/{uniqueFileName}";
 
                 // Crear objeto Image para base de datos
                 var image = new Image
@@ -88,13 +103,13 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     ImageType = imageType,
                     Description = description,
                     FileName = uniqueFileName,
-                    FilePath = filePath,
-                    PublicUrl = publicUrl,
+                    FilePath = filePath, // Ruta física del servidor
+                    PublicUrl = relativePath, // ✅ Ahora es ruta relativa
                     OriginalFileName = file.FileName,
                     FileSize = file.Length,
                     ContentType = file.ContentType,
                     CreatedAt = DateTime.Now,
-                    Tags= imageTitle + " " + tag,
+                    Tags = imageTitle + " " + tag,
                     DeviceCode = deviceId,
                     IsActive = true
                 };
@@ -103,14 +118,31 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 _context.Image.Add(image);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction("GetImage", new { imageCode = image.ImageCode }, image);
+                // ✅ Respuesta con URL completa construida dinámicamente
+                var response = new
+                {
+                    image.ImageCode,
+                    image.ImageTitle,
+                    image.ImageType,
+                    image.Description,
+                    image.FileName,
+                    PublicUrl = BuildPublicUrl(image.PublicUrl), // URL completa para el cliente
+                    RelativePath = image.PublicUrl, // Ruta relativa
+                    image.OriginalFileName,
+                    image.FileSize,
+                    image.ContentType,
+                    image.CreatedAt,
+                    image.Tags,
+                    image.DeviceCode,
+                    image.IsActive
+                };
+
+                return CreatedAtAction("GetImage", new { imageCode = image.ImageCode }, response);
             }
             catch (Exception ex)
             {
                 // Si hay error, intentar eliminar archivo físico si se creó
-                var uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(file?.FileName ?? "")}";
-                var filePath = Path.Combine(_imagesFolder, uniqueFileName);
-                if (System.IO.File.Exists(filePath))
+                if (!string.IsNullOrEmpty(filePath) && System.IO.File.Exists(filePath))
                 {
                     System.IO.File.Delete(filePath);
                 }
@@ -126,16 +158,37 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         /// </summary>
         /// <returns>Una lista de imágenes.</returns>
         [HttpGet("all")]
-        public async Task<ActionResult<IEnumerable<Image>>> GetAllImages()
+        public async Task<ActionResult<IEnumerable<object>>> GetAllImages()
         {
-            return await _context.Image.Where(i => i.IsActive).ToListAsync();
+            var images = await _context.Image.Where(i => i.IsActive).ToListAsync();
+
+            // ✅ Construir URLs completas dinámicamente
+            var response = images.Select(img => new
+            {
+                img.ImageCode,
+                img.ImageTitle,
+                img.ImageType,
+                img.Description,
+                img.FileName,
+                PublicUrl = BuildPublicUrl(img.PublicUrl), // URL completa
+                RelativePath = img.PublicUrl, // Ruta relativa
+                img.OriginalFileName,
+                img.FileSize,
+                img.ContentType,
+                img.CreatedAt,
+                img.Tags,
+                img.DeviceCode,
+                img.IsActive
+            });
+
+            return Ok(response);
         }
 
         /// <summary>
         /// Obtiene imágenes con paginación y filtros.
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<PagedResponse<Image>>> GetImages(
+        public async Task<ActionResult<object>> GetImages(
             int pageNumber = 1,
             int pageSize = 10,
             string search = null,
@@ -150,7 +203,8 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 {
                     query = query.Where(i => i.ImageCode.Contains(search) ||
                                            i.ImageTitle.Contains(search) ||
-                                           i.Description.Contains(search));
+                                           i.Description.Contains(search) ||
+                                           i.Tags.Contains(search));
                 }
 
                 // Filtro por tipo de imagen
@@ -166,7 +220,34 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     .Take(pageSize)
                     .ToListAsync();
 
-                var response = new PagedResponse<Image>(totalCount, pageNumber, pageSize, images);
+                // ✅ Construir URLs completas dinámicamente
+                var imageResponses = images.Select(img => new
+                {
+                    img.ImageCode,
+                    img.ImageTitle,
+                    img.ImageType,
+                    img.Description,
+                    img.FileName,
+                    PublicUrl = BuildPublicUrl(img.PublicUrl), // URL completa
+                    RelativePath = img.PublicUrl, // Ruta relativa
+                    img.OriginalFileName,
+                    img.FileSize,
+                    img.ContentType,
+                    img.CreatedAt,
+                    img.Tags,
+                    img.DeviceCode,
+                    img.IsActive
+                });
+
+                var response = new
+                {
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+                    Data = imageResponses
+                };
+
                 return Ok(response);
             }
             catch (Exception ex)
@@ -183,9 +264,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         /// <param name="type">Tipo de imagen (Logo, Publicidad, Item).</param>
         /// <returns>Lista de imágenes del tipo especificado.</returns>
         [HttpGet("by-type/{type}")]
-        public async Task<ActionResult<IEnumerable<Image>>> GetImagesByType(string type)
+        public async Task<ActionResult<IEnumerable<object>>> GetImagesByType(string type)
         {
-            var validTypes = new[] { "Logo", "Publicidad", "Item","Banner" };
+            var validTypes = new[] { "Logo", "Publicidad", "Item", "Banner" };
             if (!validTypes.Contains(type))
                 return BadRequest("Tipo de imagen no válido.");
 
@@ -194,14 +275,33 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 .OrderByDescending(i => i.CreatedAt)
                 .ToListAsync();
 
-            return Ok(images);
+            // ✅ Construir URLs completas dinámicamente
+            var response = images.Select(img => new
+            {
+                img.ImageCode,
+                img.ImageTitle,
+                img.ImageType,
+                img.Description,
+                img.FileName,
+                PublicUrl = BuildPublicUrl(img.PublicUrl), // URL completa
+                RelativePath = img.PublicUrl, // Ruta relativa
+                img.OriginalFileName,
+                img.FileSize,
+                img.ContentType,
+                img.CreatedAt,
+                img.Tags,
+                img.DeviceCode,
+                img.IsActive
+            });
+
+            return Ok(response);
         }
 
         /// <summary>
         /// Obtiene una imagen específica por código.
         /// </summary>
         [HttpGet("{imageCode}")]
-        public async Task<ActionResult<Image>> GetImage(string imageCode)
+        public async Task<ActionResult<object>> GetImage(string imageCode)
         {
             var image = await _context.Image
                 .FirstOrDefaultAsync(i => i.ImageCode == imageCode && i.IsActive);
@@ -209,7 +309,26 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             if (image == null)
                 return NotFound();
 
-            return image;
+            // ✅ Construir URL completa dinámicamente
+            var response = new
+            {
+                image.ImageCode,
+                image.ImageTitle,
+                image.ImageType,
+                image.Description,
+                image.FileName,
+                PublicUrl = BuildPublicUrl(image.PublicUrl), // URL completa
+                RelativePath = image.PublicUrl, // Ruta relativa
+                image.OriginalFileName,
+                image.FileSize,
+                image.ContentType,
+                image.CreatedAt,
+                image.Tags,
+                image.DeviceCode,
+                image.IsActive
+            };
+
+            return Ok(response);
         }
 
         /// <summary>
@@ -240,7 +359,7 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     image.Description = request.Description;
                 if (!string.IsNullOrEmpty(request.Tag))
                     image.Tags = request.Tag;
-                if(!string.IsNullOrWhiteSpace(request.DeviceCode))
+                if (!string.IsNullOrWhiteSpace(request.DeviceCode))
                     image.DeviceCode = request.DeviceCode;
 
                 image.UpdatedAt = DateTime.Now;
@@ -295,12 +414,12 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         [HttpGet("files/list")]
         public IActionResult ListImageFiles()
         {
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
             var files = Directory.GetFiles(_imagesFolder)
                 .Select(f => new
                 {
                     fileName = Path.GetFileName(f),
-                    url = $"{baseUrl}/images/{Path.GetFileName(f)}",
+                    relativePath = $"/images/{Path.GetFileName(f)}", // ✅ Ruta relativa
+                    publicUrl = BuildPublicUrl($"/images/{Path.GetFileName(f)}"), // URL completa
                     size = new FileInfo(f).Length,
                     createdAt = System.IO.File.GetCreationTime(f)
                 })
@@ -308,8 +427,6 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
 
             return Ok(files);
         }
-
-        
 
         /// <summary>
         /// Verifica si existe una imagen con el código especificado.
@@ -328,11 +445,7 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         public string ImageTitle { get; set; }
         public string ImageType { get; set; }
         public string Description { get; set; }
-        public string Tag
-        {
-            get; set;
-        }
+        public string Tag { get; set; }
         public string? DeviceCode { get; set; }
     }
-
 }

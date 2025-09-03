@@ -34,6 +34,64 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             _mapper = mapper;
         }
 
+        /// <summary>
+        /// Construye la URL pública completa a partir de una ruta relativa.
+        /// </summary>
+        /// <param name="relativePath">Ruta relativa (ej: /images/archivo.jpg)</param>
+        /// <returns>URL completa</returns>
+        private string BuildPublicUrl(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+                return string.Empty;
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            return $"{baseUrl}{relativePath}";
+        }
+
+        /// <summary>
+        /// Procesa un producto para incluir URLs completas de imágenes manteniendo compatibilidad.
+        /// </summary>
+        /// <param name="product">Producto a procesar</param>
+        /// <returns>Product con ImageUrl procesada</returns>
+        private Product ProcessProductWithImages(Product product)
+        {
+            // ✅ Crear una copia del producto original
+            var processedProduct = new Product
+            {
+                ItemCode = product.ItemCode,
+                EANCode = product.EANCode,
+                ItemName = product.ItemName,
+                FrgnName = product.FrgnName,
+                Price = product.Price,
+                Discount = product.Discount,
+                // ✅ CAMBIO CLAVE: ImageUrl ahora contiene la URL completa
+                ImageUrl = !string.IsNullOrEmpty(product.ImageUrl) ? BuildPublicUrl(product.ImageUrl) : product.ImageUrl,
+                Description = product.Description,
+                FrgnDescription = product.FrgnDescription,
+                SellItem = product.SellItem,
+                Available = product.Available,
+                Enabled = product.Enabled,
+                GroupItemCode = product.GroupItemCode,
+                CategoryItemCode = product.CategoryItemCode,
+                WaitingTime = product.WaitingTime,
+                Rating = product.Rating,
+                Material = product.Material,
+                Accompaniment = product.Accompaniment
+            };
+
+            return processedProduct;
+        }
+
+        /// <summary>
+        /// Procesa una lista de productos para incluir URLs completas de imágenes.
+        /// </summary>
+        /// <param name="products">Lista de productos a procesar</param>
+        /// <returns>Lista de Product con URLs construidas dinámicamente</returns>
+        private IEnumerable<Product> ProcessProductsWithImages(IEnumerable<Product> products)
+        {
+            return products.Select(ProcessProductWithImages);
+        }
+
         // GET: api/Products/all
         /// <summary>
         /// Obtiene una lista de todos los productos sin paginación ni filtros.
@@ -51,7 +109,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     .Include(p => p.Accompaniment)
                     .ToListAsync();
 
-                var productDtos = _mapper.Map<List<ProductDto>>(products);
+                // ✅ Procesar productos con URLs dinámicas
+                var processedProducts = ProcessProductsWithImages(products);
+                var productDtos = _mapper.Map<List<ProductDto>>(processedProducts);
                 return Ok(productDtos);
             }
             catch (Exception ex)
@@ -103,7 +163,8 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     query = query.Where(p =>
                         p.ItemName.ToLower().Contains(searchLower) ||
                         (p.EANCode != null && p.EANCode.ToLower().Contains(searchLower)) ||
-                        p.ItemCode.ToLower().Contains(searchLower));
+                        p.ItemCode.ToLower().Contains(searchLower) ||
+                        (p.FrgnName != null && p.FrgnName.ToLower().Contains(searchLower)));
                 }
 
                 // Calcular el total de productos después de aplicar el filtro
@@ -116,10 +177,13 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     .Take(pageSize)
                     .ToListAsync();
 
-                // Mapear la lista de entidades a la lista de DTOs de respuesta
-                var productResponseDtos = _mapper.Map<List<ProductDto>>(products);
+                // ✅ Procesar productos con URLs dinámicas manteniendo compatibilidad
+                var processedProducts = ProcessProductsWithImages(products);
 
-                // Crear la respuesta paginada
+                // Mapear la lista de entidades a la lista de DTOs de respuesta
+                var productResponseDtos = _mapper.Map<List<ProductDto>>(processedProducts);
+
+                // ✅ MANTENER la estructura PaginatedResult original
                 var totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
                 var response = new PaginatedResult<ProductDto>
                 {
@@ -167,7 +231,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     return NotFound($"No se encontró ningún producto con el código: {productCode}.");
                 }
 
-                var productResponseDto = _mapper.Map<ProductDto>(product);
+                // ✅ Procesar producto con URL dinámica manteniendo compatibilidad
+                var processedProduct = ProcessProductWithImages(product);
+                var productResponseDto = _mapper.Map<ProductDto>(processedProduct);
                 return Ok(productResponseDto);
             }
             catch (Exception ex)
@@ -203,7 +269,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     return NotFound($"No se encontraron productos para el grupo: {groupCode}.");
                 }
 
-                var productDtos = _mapper.Map<List<ProductDto>>(products);
+                // ✅ Procesar productos con URLs dinámicas manteniendo compatibilidad
+                var processedProducts = ProcessProductsWithImages(products);
+                var productDtos = _mapper.Map<List<ProductDto>>(processedProducts);
                 return Ok(productDtos);
             }
             catch (Exception ex)
@@ -239,12 +307,45 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     return NotFound($"No se encontraron productos para la categoría: {categoryCode}.");
                 }
 
-                var productDtos = _mapper.Map<List<ProductDto>>(products);
+                // ✅ Procesar productos con URLs dinámicas manteniendo compatibilidad
+                var processedProducts = ProcessProductsWithImages(products);
+                var productDtos = _mapper.Map<List<ProductDto>>(processedProducts);
                 return Ok(productDtos);
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Error al obtener productos por categoría {categoryCode}: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
+            }
+        }
+
+        // GET: api/Products/available
+        /// <summary>
+        /// Obtiene solo los productos disponibles (Available = 'Y' y Enabled = 'Y').
+        /// </summary>
+        /// <returns>Lista de productos disponibles con URLs completas.</returns>
+        [HttpGet("available")]
+        [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetAvailableProducts()
+        {
+            try
+            {
+                var products = await _context.Product
+                    .Include(p => p.Material)
+                    .Include(p => p.Accompaniment)
+                    .Where(p => p.Available == "Y" && p.Enabled == "Y" && p.SellItem == "Y")
+                    .OrderBy(p => p.ItemName)
+                    .ToListAsync();
+
+                var processedProducts = ProcessProductsWithImages(products);
+                var productDtos = _mapper.Map<List<ProductDto>>(processedProducts);
+                return Ok(productDtos);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error al obtener productos disponibles: {ex.Message}");
                 return StatusCode(StatusCodes.Status500InternalServerError,
                     new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
             }
@@ -276,74 +377,82 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     return Conflict($"Ya existe un producto con el ItemCode: {productCreateDto.ItemCode}.");
                 }
 
-                // Usar transacción para asegurar consistencia
-                using var transaction = await _context.Database.BeginTransactionAsync();
-                try
+                // ✅ CORREGIDO: Usar ExecutionStrategy para manejar transacciones con reintentos
+                var strategy = _context.Database.CreateExecutionStrategy();
+                Product createdProduct = null;
+
+                await strategy.ExecuteAsync(async () =>
                 {
-                    // 1. Crear y guardar el producto principal primero
-                    var product = _mapper.Map<Product>(productCreateDto);
-
-                    // Limpiar las colecciones para evitar problemas de mapeo
-                    product.Material = new List<ProductMaterial>();
-                    product.Accompaniment = new List<ProductAccompaniment>();
-
-                    _context.Product.Add(product);
-                    await _context.SaveChangesAsync(); // Guardar primero el producto
-
-                    // 2. Procesar materiales si existen
-                    if (productCreateDto.Material != null && productCreateDto.Material.Any())
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
                     {
-                        foreach (var materialDto in productCreateDto.Material)
-                        {
-                            // Verificar que no exista ya este material para este producto
-                            var existingMaterial = await _context.Material
-                                .FirstOrDefaultAsync(m => m.ProductItemCode == product.ItemCode && m.ItemCode == materialDto.ItemCode);
+                        // 1. Crear y guardar el producto principal primero
+                        var product = _mapper.Map<Product>(productCreateDto);
 
-                            if (existingMaterial == null)
+                        // Limpiar las colecciones para evitar problemas de mapeo
+                        product.Material = new List<ProductMaterial>();
+                        product.Accompaniment = new List<ProductAccompaniment>();
+
+                        _context.Product.Add(product);
+                        await _context.SaveChangesAsync(); // Guardar primero el producto
+
+                        // 2. Procesar materiales si existen
+                        if (productCreateDto.Material != null && productCreateDto.Material.Any())
+                        {
+                            foreach (var materialDto in productCreateDto.Material)
                             {
-                                var material = _mapper.Map<ProductMaterial>(materialDto);
-                                material.ProductItemCode = product.ItemCode;
-                                _context.Material.Add(material);
+                                // Verificar que no exista ya este material para este producto
+                                var existingMaterial = await _context.Material
+                                    .FirstOrDefaultAsync(m => m.ProductItemCode == product.ItemCode && m.ItemCode == materialDto.ItemCode);
+
+                                if (existingMaterial == null)
+                                {
+                                    var material = _mapper.Map<ProductMaterial>(materialDto);
+                                    material.ProductItemCode = product.ItemCode;
+                                    _context.Material.Add(material);
+                                }
                             }
                         }
-                    }
 
-                    // 3. Procesar acompañamientos si existen
-                    if (productCreateDto.Accompaniment != null && productCreateDto.Accompaniment.Any())
-                    {
-                        foreach (var accompanimentDto in productCreateDto.Accompaniment)
+                        // 3. Procesar acompañamientos si existen
+                        if (productCreateDto.Accompaniment != null && productCreateDto.Accompaniment.Any())
                         {
-                            // Verificar que no exista ya este acompañamiento para este producto
-                            var existingAccompaniment = await _context.Accompaniment
-                                .FirstOrDefaultAsync(a => a.ProductItemCode == product.ItemCode && a.ItemCode == accompanimentDto.ItemCode);
-
-                            if (existingAccompaniment == null)
+                            foreach (var accompanimentDto in productCreateDto.Accompaniment)
                             {
-                                var accompaniment = _mapper.Map<ProductAccompaniment>(accompanimentDto);
-                                accompaniment.ProductItemCode = product.ItemCode;
-                                _context.Accompaniment.Add(accompaniment);
+                                // Verificar que no exista ya este acompañamiento para este producto
+                                var existingAccompaniment = await _context.Accompaniment
+                                    .FirstOrDefaultAsync(a => a.ProductItemCode == product.ItemCode && a.ItemCode == accompanimentDto.ItemCode);
+
+                                if (existingAccompaniment == null)
+                                {
+                                    var accompaniment = _mapper.Map<ProductAccompaniment>(accompanimentDto);
+                                    accompaniment.ProductItemCode = product.ItemCode;
+                                    _context.Accompaniment.Add(accompaniment);
+                                }
                             }
                         }
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // 4. Recuperar el producto completo para la respuesta
+                        createdProduct = await _context.Product
+                            .Include(p => p.Material)
+                            .Include(p => p.Accompaniment)
+                            .FirstOrDefaultAsync(p => p.ItemCode == product.ItemCode);
                     }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
 
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
+                // ✅ Procesar producto creado con URL dinámica manteniendo compatibilidad
+                var processedProduct = ProcessProductWithImages(createdProduct);
+                var productResponseDto = _mapper.Map<ProductDto>(processedProduct);
 
-                    // 4. Recuperar el producto completo para la respuesta
-                    var createdProduct = await _context.Product
-                        .Include(p => p.Material)
-                        .Include(p => p.Accompaniment)
-                        .FirstOrDefaultAsync(p => p.ItemCode == product.ItemCode);
-
-                    var productResponseDto = _mapper.Map<ProductDto>(createdProduct);
-
-                    return CreatedAtAction(nameof(GetProduct), new { productCode = productResponseDto.ItemCode }, productResponseDto);
-                }
-                catch (Exception)
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
+                return CreatedAtAction(nameof(GetProduct), new { productCode = productResponseDto.ItemCode }, productResponseDto);
             }
             catch (DbUpdateException ex)
             {
@@ -390,46 +499,64 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                     return BadRequest("El código del producto en la URL no coincide con el del cuerpo de la solicitud.");
                 }
 
-                using var transaction = await _context.Database.BeginTransactionAsync();
-                try
-                {
-                    // 1. Cargar el producto existente y sus colecciones relacionadas
-                    var existingProduct = await _context.Product
-                        .Include(p => p.Material)
-                        .Include(p => p.Accompaniment)
-                        .FirstOrDefaultAsync(p => p.ItemCode == productCode);
+                // ✅ CORREGIDO: Usar ExecutionStrategy para manejar transacciones con reintentos
+                var strategy = _context.Database.CreateExecutionStrategy();
+                Product updatedProduct = null;
 
-                    if (existingProduct == null)
+                await strategy.ExecuteAsync(async () =>
+                {
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
                     {
-                        return NotFound($"No se encontró un producto con el código: {productCode}.");
+                        // 1. Cargar el producto existente y sus colecciones relacionadas
+                        var existingProduct = await _context.Product
+                            .Include(p => p.Material)
+                            .Include(p => p.Accompaniment)
+                            .FirstOrDefaultAsync(p => p.ItemCode == productCode);
+
+                        if (existingProduct == null)
+                        {
+                            throw new InvalidOperationException($"No se encontró un producto con el código: {productCode}.");
+                        }
+
+                        // 2. Mapear propiedades escalares del DTO al producto existente
+                        _mapper.Map(productUpdateDto, existingProduct);
+
+                        // 3. Manejar la actualización de los materiales
+                        await UpdateProductMaterials(existingProduct, productUpdateDto.Material);
+
+                        // 4. Manejar la actualización de los acompañamientos
+                        await UpdateProductAccompaniments(existingProduct, productUpdateDto.Accompaniment);
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        // 5. Recuperar el producto actualizado para la respuesta
+                        updatedProduct = await _context.Product
+                            .Include(p => p.Material)
+                            .Include(p => p.Accompaniment)
+                            .FirstOrDefaultAsync(p => p.ItemCode == productCode);
                     }
+                    catch (Exception)
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
 
-                    // 2. Mapear propiedades escalares del DTO al producto existente
-                    _mapper.Map(productUpdateDto, existingProduct);
-
-                    // 3. Manejar la actualización de los materiales
-                    await UpdateProductMaterials(existingProduct, productUpdateDto.Material);
-
-                    // 4. Manejar la actualización de los acompañamientos
-                    await UpdateProductAccompaniments(existingProduct, productUpdateDto.Accompaniment);
-
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // 5. Recuperar el producto actualizado para la respuesta
-                    var updatedProduct = await _context.Product
-                        .Include(p => p.Material)
-                        .Include(p => p.Accompaniment)
-                        .FirstOrDefaultAsync(p => p.ItemCode == productCode);
-
-                    var productResponseDto = _mapper.Map<ProductDto>(updatedProduct);
-                    return Ok(productResponseDto);
-                }
-                catch (Exception)
+                if (updatedProduct == null)
                 {
-                    await transaction.RollbackAsync();
-                    throw;
+                    return NotFound($"No se encontró un producto con el código: {productCode}.");
                 }
+
+                // ✅ Procesar producto actualizado con URL dinámica manteniendo compatibilidad
+                var processedProduct = ProcessProductWithImages(updatedProduct);
+                var productResponseDto = _mapper.Map<ProductDto>(processedProduct);
+                return Ok(productResponseDto);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("No se encontró"))
+            {
+                return NotFound(ex.Message);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -464,44 +591,59 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         {
             try
             {
-                using var transaction = await _context.Database.BeginTransactionAsync();
-                try
+                // ✅ CORREGIDO: Usar ExecutionStrategy para manejar transacciones con reintentos
+                var strategy = _context.Database.CreateExecutionStrategy();
+                bool productFound = false;
+
+                await strategy.ExecuteAsync(async () =>
                 {
-                    var product = await _context.Product
-                        .Include(p => p.Material)
-                        .Include(p => p.Accompaniment)
-                        .FirstOrDefaultAsync(p => p.ItemCode == productCode);
-
-                    if (product == null)
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
                     {
-                        return NotFound($"No se encontró un producto con el código: {productCode}.");
-                    }
+                        var product = await _context.Product
+                            .Include(p => p.Material)
+                            .Include(p => p.Accompaniment)
+                            .FirstOrDefaultAsync(p => p.ItemCode == productCode);
 
-                    // Eliminar materiales asociados
-                    if (product.Material != null && product.Material.Any())
+                        if (product == null)
+                        {
+                            productFound = false;
+                            return; // Salir sin hacer nada
+                        }
+
+                        productFound = true;
+
+                        // Eliminar materiales asociados
+                        if (product.Material != null && product.Material.Any())
+                        {
+                            _context.Material.RemoveRange(product.Material);
+                        }
+
+                        // Eliminar acompañamientos asociados
+                        if (product.Accompaniment != null && product.Accompaniment.Any())
+                        {
+                            _context.Accompaniment.RemoveRange(product.Accompaniment);
+                        }
+
+                        // Eliminar el producto principal
+                        _context.Product.Remove(product);
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                    }
+                    catch (Exception)
                     {
-                        _context.Material.RemoveRange(product.Material);
+                        await transaction.RollbackAsync();
+                        throw;
                     }
+                });
 
-                    // Eliminar acompañamientos asociados
-                    if (product.Accompaniment != null && product.Accompaniment.Any())
-                    {
-                        _context.Accompaniment.RemoveRange(product.Accompaniment);
-                    }
-
-                    // Eliminar el producto principal
-                    _context.Product.Remove(product);
-
-                    await _context.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    return NoContent();
-                }
-                catch (Exception)
+                if (!productFound)
                 {
-                    await transaction.RollbackAsync();
-                    throw;
+                    return NotFound($"No se encontró un producto con el código: {productCode}.");
                 }
+
+                return NoContent();
             }
             catch (Exception ex)
             {

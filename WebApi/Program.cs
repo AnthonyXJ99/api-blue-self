@@ -4,48 +4,49 @@ using Microsoft.OpenApi.Models;
 using System.Globalization;
 using System.Reflection;
 using BlueSelfCheckout.Data;
-using Microsoft.Extensions.FileProviders; // <-- IMPORTANTE para servir archivos estáticos
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// **PASO 1: Define una política CORS**
-var MyAllowSpecificOrigins = "_myAllowSpecificOrigins"; // Un nombre para tu política
+// Configuración específica para IIS
+builder.WebHost.UseIISIntegration();
 
+
+// CORS configurado para IIS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: MyAllowSpecificOrigins,
-                      builder =>
-                      {
-                          builder.WithOrigins("http://localhost:7115", // Permite tu frontend de desarrollo
-                                              "http://localhost:4200", // ← AGREGADO: Tu Angular app
-                                              "http://192.168.18.43:5023", // Si accedes al frontend por IP
-                                              "http://192.168.1.10:8080",// Ejemplo: otra IP y puerto
-                                              "http://192.168.18.239:4200")
-                                 .AllowAnyHeader() // Permite cualquier cabecera en la solicitud
-                                 .AllowAnyMethod(); // Permite cualquier método HTTP (GET, POST, PUT, DELETE, etc.)
-                                                    // .AllowCredentials(); // Agrega esto si tu frontend envía cookies o credenciales
-                      });
+    options.AddPolicy("AllowAll",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader()
+                   .WithExposedHeaders("x-pagination");
+        });
 });
 
-// --- FIN DE LA POLÍTICA CORS ---
-builder.Services.AddAutoMapper(typeof(Program).Assembly); // O typeof(MappingProfile).Assembly;
 
+builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
-// Configuración de la cultura en la aplicación
+// Configuración de la cultura
 var supportedCultures = new[] { "en-US", "es-ES" };
 var cultureInfo = new CultureInfo("en-US");
 
+// Configuración de Entity Framework con retry para IIS
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("WebApiContext") ?? throw new InvalidOperationException("Cadena de conexión 'WebApiContext' no encontrado.")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("WebApiContext") ??
+        throw new InvalidOperationException("Cadena de conexión 'WebApiContext' no encontrado."),
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorNumbersToAdd: null)));
 
-// Add services to the container.
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
 {
-    // Configuración básica de Swagger
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Version = "1.0",
@@ -58,12 +59,14 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
-    // Fix for CS0117: 'Assembly' no contiene una definición para 'GetExecutingExecutingAssembly'
-    // The correct method name is 'GetExecutingAssembly'. Update the code as follows:
-
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
+
+    // Verificar si el archivo XML existe antes de incluirlo
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
 });
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
@@ -73,38 +76,81 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedUICultures = options.SupportedCultures;
 });
 
+// Configuración de logging para IIS
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+builder.Logging.AddEventSourceLogger();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Configuración del pipeline para IIS
+if (app.Environment.IsDevelopment() )
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    // Para producción en IIS
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+
+    // Swagger también en producción (opcional, puedes comentar estas líneas)
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Blue Self Checkout API v1");
+        c.RoutePrefix = "swagger"; // Acceso: http://tuservidor/swagger
+    });
 }
 
-// **PASO 2: APLICAR LA POLÍTICA CORS - ¡ESTO ES LO QUE FALTABA!**
-app.UseCors(MyAllowSpecificOrigins); // ← AGREGADO: Aplica la política CORS
 
-// --- CONFIGURACIÓN PARA SERVIR LA CARPETA IMAGES ---
-var imagesPath = Path.Combine(Directory.GetCurrentDirectory(), "Images");
+
+// **CONFIGURACIÓN PARA SERVIR LA CARPETA IMAGES OPTIMIZADA PARA IIS**
+var contentRoot = app.Environment.ContentRootPath;
+var imagesPath = Path.Combine(contentRoot, "Images");
+
 if (!Directory.Exists(imagesPath))
 {
-    Directory.CreateDirectory(imagesPath); // Opcional: crea la carpeta si no existe
+    Directory.CreateDirectory(imagesPath);
 }
+
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(imagesPath),
-    RequestPath = "/images" // Acceso: http://localhost:xxxx/images/tuimagen.jpg
+    RequestPath = "/images"
 });
-// --- FIN DE CONFIGURACIÓN IMAGES ---
+
+// ⚠️ IMPORTANTE: UseRouting DESPUÉS de UseCors
+app.UseRouting();
+
+// ⚠️ COMENTADO: UseHttpsRedirection puede causar problemas con CORS preflight
+// Si necesitas HTTPS, úsalo DESPUÉS de CORS y configúralo correctamente
+// app.UseHttpsRedirection();
+app.UseCors("AllowAll");
 
 app.UseAuthorization();
 app.MapControllers();
 
-using (var scope = app.Services.CreateScope())
+// Migración de base de datos con mejor manejo de errores
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
-    db.Database.Migrate(); // Aplica migraciones pendientes y crea la BD si no existe
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        logger.LogInformation("Aplicando migraciones de base de datos...");
+        db.Database.Migrate();
+        logger.LogInformation("Migraciones aplicadas exitosamente.");
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "Error al aplicar migraciones de base de datos");
 }
 
 app.Run();

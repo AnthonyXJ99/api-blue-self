@@ -30,15 +30,67 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             _context = context;
         }
 
-        // GET: api/ProductCategories
+        /// <summary>
+        /// Construye la URL pública completa a partir de una ruta relativa.
+        /// </summary>
+        /// <param name="relativePath">Ruta relativa (ej: /images/archivo.jpg)</param>
+        /// <returns>URL completa</returns>
+        private string BuildPublicUrl(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath))
+                return string.Empty;
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            return $"{baseUrl}{relativePath}";
+        }
+
+        /// <summary>
+        /// Procesa una categoría para incluir URLs completas de imágenes manteniendo compatibilidad.
+        /// </summary>
+        /// <param name="category">Categoría a procesar</param>
+        /// <returns>ProductCategory con ImageUrl procesada</returns>
+        private ProductCategory ProcessCategoryWithImages(ProductCategory category)
+        {
+            // ✅ Crear una copia de la categoría original
+            var processedCategory = new ProductCategory
+            {
+                CategoryItemCode = category.CategoryItemCode,
+                CategoryItemName = category.CategoryItemName,
+                FrgnName = category.FrgnName,
+                // ✅ CAMBIO CLAVE: ImageUrl ahora contiene la URL completa
+                ImageUrl = !string.IsNullOrEmpty(category.ImageUrl) ? BuildPublicUrl(category.ImageUrl) : category.ImageUrl,
+                Description = category.Description,
+                FrgnDescription = category.FrgnDescription,
+                VisOrder = category.VisOrder,
+                Enabled = category.Enabled,
+                DataSource = category.DataSource,
+                GroupItemCode = category.GroupItemCode
+            };
+
+            return processedCategory;
+        }
+
+        /// <summary>
+        /// Procesa una lista de categorías para incluir URLs completas de imágenes.
+        /// </summary>
+        /// <param name="categories">Lista de categorías a procesar</param>
+        /// <returns>Lista de ProductCategory con URLs construidas dinámicamente</returns>
+        private IEnumerable<ProductCategory> ProcessCategoriesWithImages(IEnumerable<ProductCategory> categories)
+        {
+            return categories.Select(ProcessCategoryWithImages);
+        }
+
+        // GET: api/ProductCategories/all
         /// <summary>
         /// Obtiene una lista de todas las categorías de productos.
         /// </summary>
-        /// <returns>Una lista de objetos <see cref="ProductCategory"/>.</returns>
+        /// <returns>Una lista de objetos <see cref="ProductCategory"/> con URLs completas.</returns>
         [HttpGet("all")]
         public async Task<ActionResult<IEnumerable<ProductCategory>>> GetAllProductCategory()
         {
-            return await _context.ProductCategory.ToListAsync();
+            var categories = await _context.ProductCategory.ToListAsync();
+            var processedCategories = ProcessCategoriesWithImages(categories);
+            return Ok(processedCategories);
         }
 
         // GET: api/ProductCategories
@@ -50,14 +102,16 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         {
             try
             {
-                // Comenzamos la consulta con todos las categorias de productos
+                // Comenzamos la consulta con todas las categorias de productos
                 IQueryable<ProductCategory> query = _context.ProductCategory;
 
                 // Si se proporciona un término de búsqueda, filtramos los resultados
                 if (!string.IsNullOrEmpty(search))
                 {
-                    // Realizamos una búsqueda que sea insensible a mayúsculas y minúsculas en el código y  nombre de la categoría de producto
-                    query = query.Where(pc => pc.CategoryItemCode.Contains(search) || pc.CategoryItemName.Contains(search));
+                    // Realizamos una búsqueda que sea insensible a mayúsculas y minúsculas en el código y nombre de la categoría de producto
+                    query = query.Where(pc => pc.CategoryItemCode.Contains(search) ||
+                                             pc.CategoryItemName.Contains(search) ||
+                                             (pc.FrgnName != null && pc.FrgnName.Contains(search)));
                 }
 
                 // Calcular el total de categoría de productos después de aplicar el filtro
@@ -65,12 +119,17 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
 
                 // Obtener la página de datos solicitada
                 var productsCategory = await query
+                    .OrderBy(pc => pc.VisOrder) // Ordenar por VisOrder
+                    .ThenBy(pc => pc.CategoryItemName) // Luego por nombre
                     .Skip((pageNumber - 1) * pageSize)  // Saltar los primeros (pageNumber - 1) * pageSize registros
                     .Take(pageSize)                     // Tomar solo 'pageSize' registros
                     .ToListAsync();
 
-                // Crear la respuesta paginada
-                var response = new PagedResponse<ProductCategory>(totalCount, pageNumber, pageSize, productsCategory);
+                // ✅ Procesar categorías con URLs dinámicas manteniendo compatibilidad
+                var processedCategories = ProcessCategoriesWithImages(productsCategory);
+
+                // ✅ MANTENER la estructura PagedResponse original
+                var response = new PagedResponse<ProductCategory>(totalCount, pageNumber, pageSize, processedCategories.ToList());
 
                 return Ok(response);
             }
@@ -83,7 +142,6 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
             }
         }
-
 
         // GET: api/ProductCategories/5
         /// <summary>
@@ -101,7 +159,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 return NotFound();
             }
 
-            return productCategory;
+            // ✅ Procesar categoría con URL dinámica manteniendo compatibilidad
+            var processedCategory = ProcessCategoryWithImages(productCategory);
+            return Ok(processedCategory);
         }
 
         // PUT: api/ProductCategories/5
@@ -166,7 +226,9 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 }
             }
 
-            return CreatedAtAction("GetProductCategory", new { categoryCode = productCategory.CategoryItemCode }, productCategory);
+            // ✅ Procesar categoría creada con URL dinámica manteniendo compatibilidad
+            var processedCategory = ProcessCategoryWithImages(productCategory);
+            return CreatedAtAction("GetProductCategory", new { categoryCode = productCategory.CategoryItemCode }, processedCategory);
         }
 
         // DELETE: api/ProductCategories/5
@@ -190,8 +252,6 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             return NoContent();
         }
 
-
-
         // GET: api/ProductCategories/Groups/{groupCode}
         /// <summary>
         /// Obtiene una lista de categorias que pertenecen a un grupo de productos específico.
@@ -203,6 +263,8 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         {
             var productCategories = await _context.ProductCategory
                                           .Where(p => p.GroupItemCode == groupCode)
+                                          .OrderBy(p => p.VisOrder)
+                                          .ThenBy(p => p.CategoryItemName)
                                           .ToListAsync();
 
             if (productCategories == null || !productCategories.Any())
@@ -210,7 +272,45 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
                 return NotFound(); // Retorna 404 si no se encuentran productos para el grupo
             }
 
-            return productCategories;
+            // ✅ Procesar categorías con URLs dinámicas manteniendo compatibilidad
+            var processedCategories = ProcessCategoriesWithImages(productCategories);
+            return Ok(processedCategories);
+        }
+
+        // GET: api/ProductCategories/enabled
+        /// <summary>
+        /// Obtiene solo las categorías habilitadas (Enabled = 'Y').
+        /// </summary>
+        /// <returns>Lista de categorías habilitadas con URLs completas.</returns>
+        [HttpGet("enabled")]
+        public async Task<ActionResult<IEnumerable<ProductCategory>>> GetEnabledCategories()
+        {
+            var enabledCategories = await _context.ProductCategory
+                .Where(pc => pc.Enabled == "Y")
+                .OrderBy(pc => pc.VisOrder)
+                .ThenBy(pc => pc.CategoryItemName)
+                .ToListAsync();
+
+            var processedCategories = ProcessCategoriesWithImages(enabledCategories);
+            return Ok(processedCategories);
+        }
+
+        // GET: api/ProductCategories/with-images
+        /// <summary>
+        /// Obtiene solo las categorías que tienen imagen asignada.
+        /// </summary>
+        /// <returns>Lista de categorías con imagen y URLs completas.</returns>
+        [HttpGet("with-images")]
+        public async Task<ActionResult<IEnumerable<ProductCategory>>> GetCategoriesWithImages()
+        {
+            var categoriesWithImages = await _context.ProductCategory
+                .Where(pc => !string.IsNullOrEmpty(pc.ImageUrl))
+                .OrderBy(pc => pc.VisOrder)
+                .ThenBy(pc => pc.CategoryItemName)
+                .ToListAsync();
+
+            var processedCategories = ProcessCategoriesWithImages(categoriesWithImages);
+            return Ok(processedCategories);
         }
 
         /// <summary>
@@ -222,7 +322,6 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
         {
             return _context.ProductCategory.Any(e => e.CategoryItemCode == categoryCode);
         }
-
 
     }// fin de la clase
 
