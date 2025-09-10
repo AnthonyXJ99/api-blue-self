@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using BlueSelfCheckout.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace BlueSelfCheckout.WebApi.Models.Products
 {
@@ -71,6 +72,9 @@ namespace BlueSelfCheckout.WebApi.Models.Products
         /// ITM2 Los productos con los que puede acompañar el producto principal de compra
         /// </summary>
         public List<ProductAccompaniment> Accompaniment { get; set; } = new List<ProductAccompaniment>();
+
+        public ProductTree? ProductTree { get; set; }
+
 
     }// fin de la clase
 

@@ -35,7 +35,7 @@ var cultureInfo = new CultureInfo("en-US");
 // Configuración de Entity Framework con retry para IIS
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("WebApiContext") ??
+        builder.Configuration.GetConnectionString("DefaultConnection") ??
         throw new InvalidOperationException("Cadena de conexión 'WebApiContext' no encontrado."),
         sqlOptions => sqlOptions.EnableRetryOnFailure(
             maxRetryCount: 3,
@@ -135,12 +135,22 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Migración de base de datos con mejor manejo de errores
+// En tu Program.cs ya tienes esto, pero agrega más detalles:
 try
 {
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        // AGREGAR ESTA INFORMACIÓN PARA DEBUG
+        var connectionString = db.Database.GetConnectionString();
+        var serverName = db.Database.GetDbConnection().DataSource;
+        var databaseName = db.Database.GetDbConnection().Database;
+
+        logger.LogInformation($"Servidor: {serverName}");
+        logger.LogInformation($"Base de datos: {databaseName}");
+        logger.LogInformation($"Connection String: {connectionString}");
 
         logger.LogInformation("Aplicando migraciones de base de datos...");
         db.Database.Migrate();

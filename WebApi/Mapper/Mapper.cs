@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using BlueSelfCheckout.Models;
 using BlueSelfCheckout.WebApi.Dtos;
 using BlueSelfCheckout.WebApi.Dtos.Order;
 using BlueSelfCheckout.WebApi.Dtos.Product;
@@ -12,27 +13,30 @@ namespace BlueSelfCheckout.WebApi.Mapper
         public Mapper()
         {
 
-            // Mapeo de Product
-            CreateMap<Product, ProductDto>().ReverseMap();
+            CreateMap<Product, ProductDto>()
+     .ForMember(dest => dest.Material, opt => opt.MapFrom(src => src.ProductTree.Items1));
+
+            CreateMap<ProductCreateDto, Product>();
+            CreateMap<ProductUpdateDto, Product>();
 
             // Mapeo de ProductMaterial
-            CreateMap<ProductMaterial, ProductMaterialCreateDto>()
-                .ReverseMap()
-                .ForMember(dest => dest.Product, opt => opt.Ignore())
-                .ForMember(dest => dest.ProductItemCode, opt => opt.Ignore()); // Se establece manualmente
+            //CreateMap<ProductMaterial, ProductMaterialCreateDto>()
+            //    .ReverseMap()
+            //    .ForMember(dest => dest.Product, opt => opt.Ignore())
+            //    .ForMember(dest => dest.ProductItemCode, opt => opt.Ignore()); // Se establece manualmente
 
-            // Mapeo de ProductAccompaniment
-            CreateMap<ProductAccompaniment, ProductAccompanimentCreateDto>()
-                .ReverseMap()
-                .ForMember(dest => dest.Product, opt => opt.Ignore())
-                .ForMember(dest => dest.ProductItemCode, opt => opt.Ignore()); 
+            //// Mapeo de ProductAccompaniment
+            //CreateMap<ProductAccompaniment, ProductAccompanimentCreateDto>()
+            //    .ReverseMap()
+            //    .ForMember(dest => dest.Product, opt => opt.Ignore())
+            //    .ForMember(dest => dest.ProductItemCode, opt => opt.Ignore()); 
 
-                // Mapeo de DTO de creación de Orden a la entidad Order
-                CreateMap<OrderCreateDto, Order>()
-                // Si DocEntry se genera en la base de datos, no necesitas mapearlo desde el DTO
-                .ForMember(dest => dest.DocEntry, opt => opt.Ignore())
-                // Para la colección de líneas, AutoMapper las mapeará automáticamente
-                .ForMember(dest => dest.OrderLines, opt => opt.MapFrom(src => src.OrderLines)); // Renombrado en DTO a OrderLines
+            //    // Mapeo de DTO de creación de Orden a la entidad Order
+            //    CreateMap<OrderCreateDto, Order>()
+            //    // Si DocEntry se genera en la base de datos, no necesitas mapearlo desde el DTO
+            //    .ForMember(dest => dest.DocEntry, opt => opt.Ignore())
+            //    // Para la colección de líneas, AutoMapper las mapeará automáticamente
+            //    .ForMember(dest => dest.OrderLines, opt => opt.MapFrom(src => src.OrderLines)); // Renombrado en DTO a OrderLines
 
             // Mapeo de DTO de creación de Línea de Documento a la entidad DocumentLine
             CreateMap<DocumentLineCreateDto, OrderLine>()
@@ -73,6 +77,56 @@ namespace BlueSelfCheckout.WebApi.Mapper
 
             // Mapeo para la actualización de DocumentLine:
             CreateMap<DocumentLineUpdateDto, OrderLine>();
+
+
+            // En tu perfil de AutoMapper
+            CreateMap<ProductTree, ProductTreeDto>();
+            CreateMap<ProductTreeItem1, ProductTreeItem1Dto>();
+            CreateMap<ProductTreeDto, ProductTree>();
+            CreateMap<ProductTreeItem1Dto, ProductTreeItem1>();
+
+
+            // Mappers específicos para el sistema de acompañamientos
+            // Agregar estos mappers a tu clase de perfil de AutoMapper
+
+            // 1. Mapea desde la entidad ProductCategory a la DTO que incluye los acompañamientos
+            CreateMap<ProductCategory, CategoryWithAccompanimentsDTO>()
+                .ForMember(
+                    dest => dest.AvailableAccompaniments,
+                    opt => opt.MapFrom(src => src.Accompaniments)
+                );
+
+            // 2. Mapea desde la entidad CategoryAccompaniment a la DTO de acompañamiento (para respuestas)
+            CreateMap<CategoryAccompaniment, CategoryAccompanimentDTO>()
+                .ForMember(
+                    dest => dest.AccompanimentItemName,
+                    opt => opt.MapFrom(src => src.AccompanimentProduct != null ? src.AccompanimentProduct.ItemName : string.Empty)
+                )
+                .ForMember(
+                    dest => dest.AccompanimentImageUrl,
+                    opt => opt.MapFrom(src => src.AccompanimentProduct != null ? src.AccompanimentProduct.ImageUrl : null)
+                )
+                .ForMember(
+                    dest => dest.AccompanimentPrice,
+                    opt => opt.MapFrom(src => src.AccompanimentProduct != null ? src.AccompanimentProduct.Price : 0)
+                );
+
+            // 3. Mapea desde el DTO de creación a la entidad CategoryAccompaniment
+            CreateMap<CategoryAccompanimentForCreationDTO, CategoryAccompaniment>()
+                .ForMember(dest => dest.CategoryItemCode, opt => opt.Ignore()) // Se asigna en el controlador
+                .ForMember(dest => dest.LineNumber, opt => opt.Ignore()) // Se asigna en el controlador
+                .ForMember(dest => dest.Category, opt => opt.Ignore()) // Navigation property
+                .ForMember(dest => dest.AccompanimentProduct, opt => opt.Ignore()) // Navigation property
+                .ForMember(dest => dest.EnlargementProduct, opt => opt.Ignore()); // Navigation property
+
+            // 4. Mapea desde el DTO de actualización a la entidad CategoryAccompaniment
+            CreateMap<CategoryAccompanimentForUpdateDTO, CategoryAccompaniment>()
+                .ForMember(dest => dest.CategoryItemCode, opt => opt.Ignore()) // No se actualiza
+                .ForMember(dest => dest.LineNumber, opt => opt.Ignore()) // No se actualiza
+                .ForMember(dest => dest.AccompanimentItemCode, opt => opt.Ignore()) // No se actualiza
+                .ForMember(dest => dest.Category, opt => opt.Ignore()) // Navigation property
+                .ForMember(dest => dest.AccompanimentProduct, opt => opt.Ignore()) // Navigation property
+                .ForMember(dest => dest.EnlargementProduct, opt => opt.Ignore()); // Navigation property
         }
     }
 }

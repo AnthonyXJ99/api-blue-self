@@ -59,12 +59,12 @@ namespace BlueSelfCheckout.WebApi.Controllers
                 foreach (var item in productTree.Items1)
                 {
                     // Descomenta estas líneas si ProductTreeItem1 tiene campo ImageUrl
-                    /*
+                    
                     if (!string.IsNullOrEmpty(item.ImageUrl))
                     {
                         item.ImageUrl = BuildPublicUrl(item.ImageUrl);
                     }
-                    */
+                    
                 }
             }
 
@@ -135,18 +135,55 @@ namespace BlueSelfCheckout.WebApi.Controllers
         [HttpPut("{itemCode}")]
         public async Task<IActionResult> PutProductTree(string itemCode, ProductTree productTree)
         {
+            if (itemCode != productTree.ItemCode)
+            {
+                return BadRequest();
+            }
+
+            // 1. Get the existing ProductTree and its associated items
+            var existingProductTree = await _context.ProductTree
+                .Include(pt => pt.Items1)
+                .FirstOrDefaultAsync(pt => pt.ItemCode == itemCode);
+
+            if (existingProductTree == null)
+            {
+                return NotFound();
+            }
+
+            // 2. Update parent entity properties
+            _context.Entry(existingProductTree).CurrentValues.SetValues(productTree);
+
+            // 3. Sync child entities (ProductTreeItem1)
+            var incomingItemCodes = productTree.Items1.Select(i => new { i.ItemCode, i.LineNumber }).ToHashSet();
+            var existingItemCodes = existingProductTree.Items1.Select(i => new { i.ItemCode, i.LineNumber }).ToHashSet();
+
+            // Items to remove
+            var itemsToRemove = existingProductTree.Items1
+                .Where(e => !incomingItemCodes.Contains(new { e.ItemCode, e.LineNumber }))
+                .ToList();
+            _context.ProductTreeItem1.RemoveRange(itemsToRemove);
+
+            foreach (var incomingItem in productTree.Items1)
+            {
+                var existingItem = existingProductTree.Items1
+                    .FirstOrDefault(e => e.ItemCode == incomingItem.ItemCode && e.LineNumber == incomingItem.LineNumber);
+
+                if (existingItem != null)
+                {
+                    // Update existing item
+                    _context.Entry(existingItem).CurrentValues.SetValues(incomingItem);
+                }
+                else
+                {
+                    // Add new item
+                    incomingItem.ProductTreeItemCode = productTree.ItemCode;
+                    existingProductTree.Items1.Add(incomingItem);
+                }
+            }
+
             try
             {
-                if (itemCode != productTree.ItemCode)
-                {
-                    return BadRequest();
-                }
-
-                // Si los ProductTreeItems están siendo modificados, actualizar también
-                _context.Entry(productTree).State = EntityState.Modified;
-
                 await _context.SaveChangesAsync();
-                return NoContent();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -159,13 +196,10 @@ namespace BlueSelfCheckout.WebApi.Controllers
                     throw;
                 }
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error al actualizar el ProductTree con código {itemCode}: {ex.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError,
-                    new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
-            }
+
+            return NoContent();
         }
+
 
         // POST: api/ProductTrees
         [HttpPost]
@@ -173,21 +207,21 @@ namespace BlueSelfCheckout.WebApi.Controllers
         {
             try
             {
-                // Añadir los ProductTreeItems antes de guardar el ProductTree
                 if (productTree.Items1 != null && productTree.Items1.Any())
                 {
+                    // Assign a LineNumber to each item before adding
+                    int lineNumber = 0;
                     foreach (var item in productTree.Items1)
                     {
-                        // Asociamos los Items con el ProductTree
+                        item.LineNumber = lineNumber++;
                         item.ProductTreeItemCode = productTree.ItemCode;
-                        _context.ProductTreeItem1.Add(item);
                     }
                 }
 
                 _context.ProductTree.Add(productTree);
                 await _context.SaveChangesAsync();
 
-                // ✅ Procesar ProductTree creado con URLs dinámicas manteniendo compatibilidad
+                // ... rest of your code to process and return the result
                 var createdProductTree = await _context.ProductTree
                     .Include(pt => pt.Items1)
                     .FirstOrDefaultAsync(pt => pt.ItemCode == productTree.ItemCode);
@@ -196,7 +230,7 @@ namespace BlueSelfCheckout.WebApi.Controllers
 
                 return CreatedAtAction("GetProductTree", new { itemCode = productTree.ItemCode }, processedProductTree);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
             {
                 if (ProductTreeExists(productTree.ItemCode))
                 {
@@ -204,17 +238,10 @@ namespace BlueSelfCheckout.WebApi.Controllers
                 }
                 else
                 {
-                    throw;
+                    return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error al crear ProductTree.", error = ex.Message });
                 }
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error al crear el ProductTree: {ex.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError,
-                    new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
-            }
         }
-
         // DELETE: api/ProductTrees/5
         [HttpDelete("{itemCode}")]
         public async Task<IActionResult> DeleteProductTree(string itemCode)

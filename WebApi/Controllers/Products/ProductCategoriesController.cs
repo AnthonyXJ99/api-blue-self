@@ -313,6 +313,60 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             return Ok(processedCategories);
         }
 
+
+        // GET: api/ProductCategories/with-accompaniments
+        /// <summary>
+        /// Obtiene las categorías habilitadas que tienen acompañamientos configurados, incluyendo los detalles de los acompañamientos.
+        /// </summary>
+        /// <returns>Lista de categorías con sus acompañamientos y URLs completas.</returns>
+        [HttpGet("with-accompaniments")]
+        public async Task<ActionResult<IEnumerable<object>>> GetCategoriesWithAccompaniments()
+        {
+            try
+            {
+                var categoriesWithAccompaniments = await _context.ProductCategory
+                    .Include(c => c.Accompaniments)
+                        .ThenInclude(a => a.AccompanimentProduct)
+                    .Where(c => c.Enabled == "Y")
+                    .OrderBy(c => c.VisOrder)
+                    .ThenBy(c => c.CategoryItemName)
+                    .ToListAsync();
+
+                var result = categoriesWithAccompaniments.Select(category => new
+                {
+                    CategoryItemCode = category.CategoryItemCode,
+                    CategoryItemName = category.CategoryItemName,
+                    FrgnName = category.FrgnName,
+                    ImageUrl = BuildPublicUrl(category.ImageUrl),
+                    Description = category.Description,
+                    FrgnDescription = category.FrgnDescription,
+                    VisOrder = category.VisOrder,
+                    Enabled = category.Enabled,
+                    DataSource = category.DataSource,
+                    GroupItemCode = category.GroupItemCode,
+                    Accompaniments = category.Accompaniments.Select(acc => new
+                    {
+                        LineNumber = acc.LineNumber,
+                        AccompanimentItemCode = acc.AccompanimentItemCode,
+                        AccompanimentItemName = acc.AccompanimentProduct?.ItemName ?? string.Empty,
+                        AccompanimentImageUrl = BuildPublicUrl(acc.AccompanimentProduct?.ImageUrl),
+                        AccompanimentPrice = acc.AccompanimentProduct?.Price ?? 0,
+                        Discount = acc.Discount,
+                        EnlargementItemCode = acc.EnlargementItemCode,
+                        EnlargementDiscount = acc.EnlargementDiscount
+                    }).OrderBy(a => a.LineNumber).ToList()
+                });
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = "Ocurrió un error al procesar la solicitud", error = ex.Message });
+            }
+        }
+
+
         /// <summary>
         /// Verifica si una categoría de producto con el código especificado existe en la base de datos.
         /// </summary>
@@ -323,6 +377,12 @@ namespace BlueSelfCheckout.WebApi.Controllers.Products
             return _context.ProductCategory.Any(e => e.CategoryItemCode == categoryCode);
         }
 
+
+
+
     }// fin de la clase
+
+
+
 
 }// fin del namespace

@@ -112,13 +112,16 @@ namespace BlueSelfCheckout.WebApi.Dtos.Product
         /// <summary>
         /// Materiales asociados al artículo.
         /// </summary>
-        public List<ProductMaterialCreateDto>? Material { get; set; }
+        //public List<ProductMaterialCreateDto>? Material { get; set; }
+        public List<ProductTreeItem1Dto>? Material { get; set; }
 
         /// <summary>
         /// Acompañamientos asociados al artículo.
         /// </summary>
-        public List<ProductAccompanimentCreateDto>? Accompaniment { get; set; }
+       // public List<ProductAccompanimentCreateDto>? Accompaniment { get; set; }
     }
+   
+    
     public class ProductMaterialCreateDto
     {
         [Required(ErrorMessage = "El código del material es requerido.")]
@@ -167,6 +170,49 @@ namespace BlueSelfCheckout.WebApi.Dtos.Product
 
         // ProductItemCode y la navegación a Product no son necesarios aquí,
         // ya que la relación se establecerá al mapear en el controlador.
+    }
+
+
+    // Para crear productos (sin Material/Accompaniment)
+    public class ProductCreateDto
+    {
+        public string ItemCode { get; set; } = string.Empty;
+        public string? EANCode { get; set; }
+        public string ItemName { get; set; } = string.Empty;
+        public string? FrgnName { get; set; }
+        public decimal Price { get; set; }
+        public decimal? Discount { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? Description { get; set; }
+        public string? FrgnDescription { get; set; }
+        public string SellItem { get; set; } = "Y";
+        public string Available { get; set; } = "Y";
+        public string Enabled { get; set; } = "Y";
+        public string? GroupItemCode { get; set; }
+        public string? CategoryItemCode { get; set; }
+        public string? WaitingTime { get; set; }
+        public decimal? Rating { get; set; }
+    }
+
+    // Para actualizar productos (sin Material/Accompaniment)
+    public class ProductUpdateDto
+    {
+        public string ItemCode { get; set; } = string.Empty;
+        public string? EANCode { get; set; }
+        public string ItemName { get; set; } = string.Empty;
+        public string? FrgnName { get; set; }
+        public decimal Price { get; set; }
+        public decimal? Discount { get; set; }
+        public string? ImageUrl { get; set; }
+        public string? Description { get; set; }
+        public string? FrgnDescription { get; set; }
+        public string SellItem { get; set; } = "Y";
+        public string Available { get; set; } = "Y";
+        public string Enabled { get; set; } = "Y";
+        public string? GroupItemCode { get; set; }
+        public string? CategoryItemCode { get; set; }
+        public string? WaitingTime { get; set; }
+        public decimal? Rating { get; set; }
     }
 
 }

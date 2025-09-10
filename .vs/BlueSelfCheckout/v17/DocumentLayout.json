@@ -1,14 +1,18 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\bartech_autoservicio-main\\bartech_autoservicio-main\\API\\WebApi\\",
+  "WorkspaceRootPath": "C:\\proyects\\BACKENDS\\api-blue-self\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|c:\\bartech_autoservicio-main\\bartech_autoservicio-main\\api\\webapi\\webapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|solutionrelative:webapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|c:\\proyects\\backends\\api-blue-self\\webapi\\controllers\\products\\productscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|solutionrelative:webapi\\controllers\\products\\productscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|c:\\bartech_autoservicio-main\\bartech_autoservicio-main\\api\\webapi\\webapi\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|solutionrelative:webapi\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|c:\\proyects\\backends\\api-blue-self\\webapi\\dtos\\product\\productdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|solutionrelative:webapi\\dtos\\product\\productdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|c:\\proyects\\backends\\api-blue-self\\webapi\\controllers\\products\\productcategoriescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A548E102-B72A-41D8-B7C7-0DEC055545B2}|WebApi\\BlueSelfCheckout.WebApi.csproj|solutionrelative:webapi\\controllers\\products\\productcategoriescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -18,7 +22,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Bookmark",
@@ -27,27 +31,39 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "launchSettings.json",
-              "DocumentMoniker": "C:\\bartech_autoservicio-main\\bartech_autoservicio-main\\API\\WebApi\\WebApi\\Properties\\launchSettings.json",
-              "RelativeDocumentMoniker": "WebApi\\Properties\\launchSettings.json",
-              "ToolTip": "C:\\bartech_autoservicio-main\\bartech_autoservicio-main\\API\\WebApi\\WebApi\\Properties\\launchSettings.json",
-              "RelativeToolTip": "WebApi\\Properties\\launchSettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAAAGAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2025-08-29T02:40:08.331Z",
+              "Title": "ProductDto.cs",
+              "DocumentMoniker": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Dtos\\Product\\ProductDto.cs",
+              "RelativeDocumentMoniker": "WebApi\\Dtos\\Product\\ProductDto.cs",
+              "ToolTip": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Dtos\\Product\\ProductDto.cs",
+              "RelativeToolTip": "WebApi\\Dtos\\Product\\ProductDto.cs",
+              "ViewState": "AgIAAGEAAAAAAAAAAAAywHgAAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-09T14:09:45.434Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\bartech_autoservicio-main\\bartech_autoservicio-main\\API\\WebApi\\WebApi\\Program.cs",
-              "RelativeDocumentMoniker": "WebApi\\Program.cs",
-              "ToolTip": "C:\\bartech_autoservicio-main\\bartech_autoservicio-main\\API\\WebApi\\WebApi\\Program.cs",
-              "RelativeToolTip": "WebApi\\Program.cs",
-              "ViewState": "AgIAAGYAAAAAAAAAAAAuwFcAAAAkAAAAAAAAAA==",
+              "DocumentIndex": 2,
+              "Title": "ProductCategoriesController.cs",
+              "DocumentMoniker": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Controllers\\Products\\ProductCategoriesController.cs",
+              "RelativeDocumentMoniker": "WebApi\\Controllers\\Products\\ProductCategoriesController.cs",
+              "ToolTip": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Controllers\\Products\\ProductCategoriesController.cs",
+              "RelativeToolTip": "WebApi\\Controllers\\Products\\ProductCategoriesController.cs",
+              "ViewState": "AgIAAFABAAAAAAAAAAAAAFABAAAfAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-01T21:04:49.615Z",
+              "WhenOpened": "2025-09-09T13:17:06.964Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ProductsController.cs",
+              "DocumentMoniker": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Controllers\\Products\\ProductsController.cs",
+              "RelativeDocumentMoniker": "WebApi\\Controllers\\Products\\ProductsController.cs",
+              "ToolTip": "C:\\proyects\\BACKENDS\\api-blue-self\\WebApi\\Controllers\\Products\\ProductsController.cs",
+              "RelativeToolTip": "WebApi\\Controllers\\Products\\ProductsController.cs",
+              "ViewState": "AgIAAEoAAAAAAAAAAAAwwF8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-09T13:15:54.164Z",
               "EditorCaption": ""
             }
           ]

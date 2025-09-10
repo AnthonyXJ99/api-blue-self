@@ -43,6 +43,9 @@ namespace BlueSelfCheckout.WebApi.Models.Products
         public string? GroupItemCode { get; set; }
 
 
+        public virtual ICollection<CategoryAccompaniment> Accompaniments { get; set; } = new List<CategoryAccompaniment>();
+
+
     }// fin de la clase
 
 }// fin del namespace
